@@ -44,6 +44,12 @@ class ReplayBufferGRU:
             self):  # cannot work in multiprocessing case, len(replay_buffer) is not available in proxy of manager!
         return len(self.buffer)
 
+    def get_buffer(self):
+        return self.buffer
+
+    def set_buffer(self, buffer):
+        self.buffer = buffer
+
     def get_length(self):
         return len(self.buffer)
 

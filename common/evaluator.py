@@ -36,7 +36,7 @@ class Evaluator(object):
             # reset at the start of episode
             env.close()
             observation = env.reset()
-            env.render_background(mode='human')
+            #env.render_background(mode='human')
 #            print("---------------------------------------------")
 #            print("goal (x: " + str(env.goal_x) + ", y: " + str(env.goal_y) + ")")
 #            episode_memory.append(observation)
@@ -61,11 +61,12 @@ class Evaluator(object):
 #                observation = episode_memory.getObservation(self.window_length, observation)
                 # Change the episode when episode_steps reach max_episode_length
                 if self.max_episode_length and episode_steps >= self.max_episode_length -1:
-                    env.render(mode='human')
+                    #env.render(mode='human')
                     done = True
 
                 if visualize:
-                    env.render(mode='human')
+                    pass
+                    #env.render(mode='human')
 
                 # update
                 episode_reward += reward

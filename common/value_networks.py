@@ -38,7 +38,6 @@ class QNetworkGRU(QNetworkBase):
     def __init__(self, state_space, action_space, hidden_1, hidden_2, hidden_3, n_layers, drop_prob, activation=F.relu, output_activation=None):
         super().__init__(state_space, action_space, activation)
 #        self.hidden_1 = hidden_1
-
         self.linear1 = nn.Linear(self._state_dim+self._action_dim, hidden_1)
         self.linear2 = nn.Linear(hidden_1, hidden_2)
         self.gru1 = nn.GRU(hidden_2, hidden_3, n_layers, dropout=drop_prob)

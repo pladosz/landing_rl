@@ -149,3 +149,27 @@ class RDPG():
 #        self.qnet.eval()
 #        self.target_qnet.eval()
 #        self.policy_net.eval()
+
+    def save_checkpoint(self,path,episode, reward, epsilon,total_steps, frame_idx, batch_length):
+        torch.save({
+            'episode': episode,
+            'qnet_state_dict': self.qnet.state_dict(),
+            'target_qnet_state_dict': self.target_qnet.state_dict(),
+            'policy_state_dict': self.policy_net.state_dict(),
+            'policy_optimizer_state_dict': self.policy_optimizer.state_dict(),
+            'q_optimizer_state_dict': self.q_optimizer.state_dict(),
+            'reward': reward,
+            'experience_buffer': self.replay_buffer.get_buffer(),
+            'epsilon': epsilon,
+            'total_steps': total_steps,
+            'frame_idx': frame_idx,
+            'batch_length': batch_length
+            }, path)
+    
+    def load_checkpoint(self, checkpoint):
+        self.qnet.load_state_dict(checkpoint['qnet_state_dict'])
+        self.target_qnet.load_state_dict(checkpoint['target_qnet_state_dict'])
+        self.policy_net.load_state_dict(checkpoint['policy_state_dict'])
+        self.policy_optimizer.load_state_dict(checkpoint['policy_optimizer_state_dict'])
+        self.q_optimizer.load_state_dict(checkpoint['q_optimizer_state_dict'])
+        self.replay_buffer.set_buffer(checkpoint['experience_buffer'])

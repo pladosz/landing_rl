@@ -52,20 +52,23 @@ if __name__ == '__main__':
     parser.add_argument('--drop_prob', default=0.2, type=float, help='dropout_probability')
 
     # Set learning parameter
-    parser.add_argument('--rbsize', default=100000, type=int, help='Memory size')
+    parser.add_argument('--rbsize', default=20000, type=int, help='Memory size')
     parser.add_argument('--bsize', default=128, type=int, help='minibatch size')
     parser.add_argument('--blength', default=1, type=int, help='minibatch sequence length')
-    parser.add_argument('--warmup', default=100000, type=int, help='warmup size (steps or episodes)')
+    parser.add_argument('--warmup', default=20000, type=int, help='warmup size (steps or episodes)')
     parser.add_argument('--max_episodes', default=100000, type=int, help='Number of episodes')
     parser.add_argument('--max_episode_length', default=300, type=int, help='Number of steps for each episode')
-    parser.add_argument('--validate_episodes', default=20, type=int, help='Number of episodes to perform validation')
+    parser.add_argument('--validate_episodes', default=5, type=int, help='Number of episodes to perform validation')
     parser.add_argument('--validate_interval', default=1000, type=int, help='Validation episode interval')
-    parser.add_argument('--epsilon_rate', default=0.1, type=int, help='linear decay of exploration policy')
+    parser.add_argument('--epsilon_rate', default=0.1, type=float, help='linear decay of exploration policy')
 
     #etc
     parser.add_argument('--pause_time', default=0, type=float, help='Pause time for evaluation')
     parser.add_argument('--model_path', default='model/rdpg_pf_dir_vel_no_penalty_center_extreme_noisy_1004', type=str, help='Output root')
     parser.add_argument('--model_path_current', default='model/rdpg_pf_dir_vel_no_penalty_center_extreme_noisy_1004_current', type=str, help='Output root')
+    parser.add_argument('--model_path_checkpoint', default='model/rdpg_landing_checkpoint.pt', type=str, help='checkpoint save file')
+    parser.add_argument('--save_interval', default=100, type=int, help='how often checkpoint is saved')
+    parser.add_argument('--load_checkpoint', default = '', type = str, help= 'string for loading data')
 
 
     args = parser.parse_args()
@@ -92,7 +95,6 @@ if __name__ == '__main__':
     if args.mode == 'train':
         # alg.load_model(model_path)
 #        alg.load_model('model/rdpg_pf_seq_1/gym_ste:StePFilterConvHardEnv-v0-run9')
-
         # hyper-parameters
         max_episodes  = args.max_episodes
         max_steps   = args.max_episode_length
@@ -103,12 +105,21 @@ if __name__ == '__main__':
         highest_reward = -100
         update_bool = False
         validate_start = 0
-        for i_episode in range (max_episodes):
+        starting_episode = 0
+        if args.load_checkpoint:
+            checkpoint = torch.load(args.load_checkpoint)
+            epsilon_steps = checkpoint['epsilon']
+            alg.load_checkpoint(checkpoint)
+            starting_episode = checkpoint['episode']
+            total_steps =  checkpoint['total_steps']
+            frame_idx =  checkpoint['frame_idx']
+            batch_length = checkpoint['batch_length']
+        for i_episode in range (starting_episode, max_episodes):
             q_loss_list=[]
             policy_loss_list=[]
             state = env.reset()
             episode_reward = 0
-            last_action = [0, 0]
+            last_action = [0, 0, 0]
 #            episode_state = []
 #            episode_action = []
 #            episode_last_action = []
@@ -142,7 +153,6 @@ if __name__ == '__main__':
                 noise_level = max((epsilon_steps - total_steps)/epsilon_steps, 0)
                 action, hidden_out = alg.policy_net.get_action(state, hidden_in, noise_level)
                 next_state, reward, done, info = env.step(action)
-
                 if batch_length==0:
                     batch_state = []
                     batch_action = []
@@ -195,6 +205,8 @@ if __name__ == '__main__':
 
             print('Eps: ', i_episode, '| Reward: ', np.sum(episode_reward), '| Loss: ', np.average(q_loss_list), np.average(policy_loss_list), 
                   " | total_step: ", total_steps, " | buffer length: ", replay_buffer.get_length())
+            if i_episode % args.save_interval == 0:
+                alg.save_checkpoint(args.model_path_checkpoint, i_episode,  np.sum(episode_reward), epsilon_steps, total_steps, frame_idx, batch_length)
 #            replay_buffer.push(ini_hidden_in, ini_hidden_out, episode_state, episode_action, episode_last_action, \
 #                episode_reward, episode_next_state, episode_done)
 
@@ -211,7 +223,7 @@ if __name__ == '__main__':
             # reset at the start of episode
             env.close()
             observation = env.reset()
-            env.render_background(mode='human')
+            #env.render_background(mode='human')
             episode_steps = 0
             episode_reward = 0.
             
@@ -229,7 +241,7 @@ if __name__ == '__main__':
 #                observation = episode_memory.getObservation(self.window_length, observation)
                 # Change the episode when episode_steps reach max_episode_length
                 
-                env.render(mode='human')
+                #env.render(mode='human')
 
                 # update
                 episode_reward += reward
