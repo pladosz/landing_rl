@@ -30,6 +30,11 @@ from gym import spaces
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
+#pybullet imports
+from gym_pybullet_drones.utils.Logger import Logger
+from gym_pybullet_drones.envs.single_agent_rl.TakeoffAviary import TakeoffAviary
+from gym_pybullet_drones.utils.utils import sync, str2bool
+
 #class NormalizedActions(gym.ActionWrapper): # gym env wrapper
 #    def _action(self, action):
 
@@ -119,7 +124,7 @@ if __name__ == '__main__':
             policy_loss_list=[]
             state = env.reset()
             episode_reward = 0
-            last_action = [0, 0, 0]
+            last_action = [0, 0, 0, 0]
 #            episode_state = []
 #            episode_action = []
 #            episode_last_action = []

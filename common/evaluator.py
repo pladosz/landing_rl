@@ -34,7 +34,7 @@ class Evaluator(object):
         for episode in range(self.num_episodes):
 
             # reset at the start of episode
-            env.close()
+            #env.close()
             observation = env.reset()
             #env.render_background(mode='human')
 #            print("---------------------------------------------")
