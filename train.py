@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # Set network parameter
     parser.add_argument('--hidden_1', default=300, type=int, help='hidden num of first fully connect layer')
     parser.add_argument('--hidden_2', default=64, type=int, help='input num of GRU layer')
-    parser.add_argument('--hidden_3', default=32, type=int, help='output num of GRU layer')
+    parser.add_argument('--hidden_3', default=64, type=int, help='output num of GRU layer')
     parser.add_argument('--n_layers', default=1, type=int, help='number of stack for hidden layer')
     parser.add_argument('--rate', default=0.0001, type=float, help='learning rate')
     parser.add_argument('--prate', default=0.00001, type=float, help='policy net learning rate (only for DDPG)')

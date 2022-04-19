@@ -38,11 +38,12 @@ class QNetworkGRU(QNetworkBase):
     def __init__(self, state_space, action_space, hidden_1, hidden_2, hidden_3, n_layers, drop_prob, activation=F.relu, output_activation=None):
         super().__init__(state_space, action_space, activation)
 #        self.hidden_1 = hidden_1
-        self.linear1 = nn.Linear(self._state_dim+self._action_dim, hidden_1)
-        self.linear2 = nn.Linear(hidden_1, hidden_2)
-        self.gru1 = nn.GRU(hidden_2, hidden_3, n_layers, dropout=drop_prob)
+        self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.gru1 = nn.GRU(1024, hidden_3, n_layers, dropout=drop_prob)
 #        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = nn.Linear(hidden_3, 1)
+        self.linear3 = nn.Linear(hidden_3, self._action_dim) # output dim = dim of action
         # weights initialization
         self.linear3.apply(linear_weights_init)
         
@@ -58,15 +59,16 @@ class QNetworkGRU(QNetworkBase):
 #        state = state.expand(32,1,9)
 #        print(state.size())
 #        print(state)
-        state = state.permute(1,0,2)
-        action = action.permute(1,0,2)
-#        last_action = last_action.permute(1,0,2)
-        # single branch
-        x = torch.cat([state, action], -1) 
-        x = self.activation(self.linear1(x))
-        x = self.activation(self.linear2(x))
-        x, lstm_hidden = self.gru1(x, hidden_in)  # no activation after lstm
-#        x = self.activation(self.linear2(x))
-        x = self.linear3(x)
+        #state = state.permute(1,0,2)
+        x = state
+        x = F.relu(self.conv1(x))   # lstm_branch: sequential data
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = torch.flatten(x, start_dim = 1)
+        x = x.unsqueeze(0)
+        # hidden only for initialization, later on hidden states are passed automatically for sequential data
+        x,  lstm_hidden = self.gru1(x, hidden_in)    # no activation after lstm
+#        x = activation(self.linear2(x))
+        x = F.tanh(self.linear3(x))
         x = x.permute(1,0,2)  # back to same axes as input    
         return x, lstm_hidden    # lstm_hidden is actually tuple: (hidden, cell)

@@ -49,9 +49,10 @@ class DPG_PolicyNetworkGRU(PolicyNetworkBase):
 #        self.hidden_2 = hidden_2
 #        self.hidden_3 = hidden_3
 
-        self.linear1 = nn.Linear(self._state_dim, hidden_1)
-        self.linear2 = nn.Linear(hidden_1, hidden_2)
-        self.gru1 = nn.GRU(hidden_2, hidden_3, n_layers, dropout=drop_prob)
+        self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.gru1 = nn.GRU(1024, hidden_3, n_layers, dropout=drop_prob)
 #        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.linear3 = nn.Linear(hidden_3, self._action_dim) # output dim = dim of action
 
@@ -67,19 +68,22 @@ class DPG_PolicyNetworkGRU(PolicyNetworkBase):
         for lstm needs to be permuted as: (sequence_length, batch_size, -1)
         """
 #        print(hidden_in[0][0].size())
-        state = state.permute(1,0,2)
+        #state = state.permute(1,0,2)
 #        last_action = last_action.permute(1,0,2)
-        activation=F.relu
+        #activation=F.relu
         # single branch
-        x = torch.cat([state], -1)
-        x = activation(self.linear1(x))   # lstm_branch: sequential data
-        x = activation(self.linear2(x))
+        # = torch.cat([state], -1)
+        x = state
+        x = F.relu(self.conv1(x))   # lstm_branch: sequential data
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = torch.flatten(x, start_dim = 1)
+        x = x.unsqueeze(0)
         # hidden only for initialization, later on hidden states are passed automatically for sequential data
         x,  lstm_hidden = self.gru1(x, hidden_in)    # no activation after lstm
 #        x = activation(self.linear2(x))
         x = F.tanh(self.linear3(x))
         x = x.permute(1,0,2)  # permute back
-
         return x, lstm_hidden    # lstm_hidden is actually tuple: (hidden, cell)
 
     def evaluate(self, state, hidden_in, noise_scale=0.0):
@@ -104,7 +108,7 @@ class DPG_PolicyNetworkGRU(PolicyNetworkBase):
         '''
         select action for sampling, no gradients flow, noisy action, return .cpu
         '''
-        state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(0).cuda() # increase 2 dims to match with training data
+        state = torch.FloatTensor(state).unsqueeze(0).cuda() # increase 2 dims to match with training data
 #        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).cuda()
         normal = Normal(0, 1)
         action, hidden_out = self.forward(state, hidden_in)
