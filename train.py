@@ -157,7 +157,9 @@ if __name__ == '__main__':
                 hidden_in = hidden_out
                 noise_level = max((epsilon_steps - total_steps)/epsilon_steps, 0)
                 action, hidden_out = alg.policy_net.get_action(state, hidden_in, noise_level)
-                next_state, reward, done, info = env.step(action)
+                for i in range(0, 100):
+                    next_state, reward, done, info = env.step(action)
+
                 if batch_length==0:
                     batch_state = []
                     batch_action = []
