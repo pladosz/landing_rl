@@ -34,6 +34,9 @@ writer = SummaryWriter()
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.envs.single_agent_rl.TakeoffAviary import TakeoffAviary
 from gym_pybullet_drones.utils.utils import sync, str2bool
+from PIL import Image
+
+
 
 #class NormalizedActions(gym.ActionWrapper): # gym env wrapper
 #    def _action(self, action):
@@ -157,8 +160,11 @@ if __name__ == '__main__':
                 hidden_in = hidden_out
                 noise_level = max((epsilon_steps - total_steps)/epsilon_steps, 0)
                 action, hidden_out = alg.policy_net.get_action(state, hidden_in, noise_level)
-                for i in range(0, 100):
-                    next_state, reward, done, info = env.step(action)
+                next_state, reward, done, info = env.step(action)
+                #print(np.max(next_state))
+                im = Image.fromarray(next_state.transpose(1, 2, 0), 'RGBA')
+                im.save("test_images/drone_view_{0}.png".format(step))
+
 
                 if batch_length==0:
                     batch_state = []
@@ -209,7 +215,7 @@ if __name__ == '__main__':
                     batch_length = 0
                     break        
 
-
+            exit()
             print('Eps: ', i_episode, '| Reward: ', np.sum(episode_reward), '| Loss: ', np.average(q_loss_list), np.average(policy_loss_list), 
                   " | total_step: ", total_steps, " | buffer length: ", replay_buffer.get_length())
             if i_episode % args.save_interval == 0:
