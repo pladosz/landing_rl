@@ -63,7 +63,7 @@
       <geometry>
         <cylinder length="${0.025*k_car}" radius="${0.06*k_car}"/>
       </geometry>
-      <material name="Black"/>
+      <material name="Blue"/>
     </visual>
     <collision>
       <origin rpy="${pi/2} 0 0" xyz="0 0 0"/>

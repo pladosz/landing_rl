@@ -107,7 +107,7 @@
       <geometry>
         <cylinder length="0.025" radius="0.06"/>
       </geometry>
-      <material name="Black"/>
+      <material name="Blue"/>
     </visual>
     <collision>
       <origin rpy="1.5707963267948966 0 0" xyz="0 0 0"/>
@@ -137,7 +137,7 @@
       <geometry>
         <cylinder length="0.025" radius="0.06"/>
       </geometry>
-      <material name="Black"/>
+      <material name="Blue"/>
     </visual>
     <collision>
       <origin rpy="1.5707963267948966 0 0" xyz="0 0 0"/>
@@ -198,7 +198,7 @@
       <geometry>
         <cylinder length="0.025" radius="0.06"/>
       </geometry>
-      <material name="Black"/>
+      <material name="Blue"/>
     </visual>
     <collision>
       <origin rpy="1.5707963267948966 0 0" xyz="0 0 0"/>
@@ -227,7 +227,7 @@
       <geometry>
         <cylinder length="0.025" radius="0.06"/>
       </geometry>
-      <material name="Black"/>
+      <material name="Blue"/>
     </visual>
     <collision>
       <origin rpy="1.5707963267948966 0 0" xyz="0 0 0"/>
