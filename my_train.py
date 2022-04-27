@@ -36,47 +36,96 @@ env = 'landing-aviary-v0'
 env = gym.make(env)
 
 
-max_step = 3
+max_step = 50
+
+errors = []
 
 state=env.reset()
-action = [1, 1, 1, 2]
+action = [0, 0, 0, 0]
+
+red = [5, 5]
 
 for step in range(max_step):
     
     next_state, reward, done, info = env.step(action)
     im_array = next_state.transpose(1, 2, 0)
-    im = Image.fromarray(im_array, 'RGBA')
+    
 
+
+    # Find the most black point
     darkest = 500
-    dark = [5, 5]
+    black = [5, 5]
 
     for x in range(0, np.shape(im_array)[1]):
         for y in range(9, np.shape(im_array)[0]-9):
             csum = im_array[y][x][0]/3+im_array[y][x][1]/3+im_array[y][x][2]/3
             if csum < darkest:
                 darkest = csum
-                dark = np.array([y, x])
+                black = np.array([y, x])
+    
 
-    im_array[dark[0]][dark[1]] = [255, 255, 255, 255]
+    
+    # Find the first red point
+    found = False
+    for x in range(0, np.shape(im_array)[1]):
+        for y in range(9, np.shape(im_array)[0]-9):
+            if (im_array[y][x][0] > 150 and im_array[y][x][1] < 100):
+                red = np.array([y, x])
+                found = True
+                break
+            if found:
+                break
+        if found:
+            break
+
+
+    im_array[red[0]][red[1]] = [255, 255, 255, 255]
+    im_array[black[0]][black[1]] = [255, 255, 255, 255]
+
     im_array[32][32] = [128, 0, 128, 255]
+    im_array[15][20] = [128, 0, 128, 255]
 
+
+    e = np.zeros(4)
+    e[0:2] = black-np.array([32, 32])
+    e[2:4] = red - np.array([15, 20])
+    errors.append(sum(e*e)**0.5)
+
+    
+    
+
+    im = Image.fromarray(im_array, 'RGBA')
     im.save("test_images/drone_view_{0}.png".format(step))
+
+
 
     lamb = 0.1
     Z = 1
-    Lx = np.array([[-1/Z, 0, dark[1]/Z, dark[0]*dark[1], -(1+dark[1]**2), dark[0]],
-                   [0, -1/Z, dark[0]/Z, 1+dark[0]**2, -dark[0]*dark[1], -dark[1]]])
+    Lx1 = np.array([[-1/Z, 0, black[1]/Z, black[0]*black[1], -(1+black[1]**2), black[0]],
+                   [0, -1/Z, black[0]/Z, 1+black[0]**2, -black[0]*black[1], -black[1]]])
 
-    e = dark-np.array([32, 32])
-    # L_ep = np.dot(np.linalg.inv(np.dot(Lx.transpose(), Lx)), Lx.transpose())
+    Lx2 = np.array([[-1/Z, 0, red[1]/Z, red[0]*red[1], -(1+red[1]**2), red[0]],
+                   [0, -1/Z, red[0]/Z, 1+red[0]**2, -red[0]*red[1], -red[1]]])    
+
     
-    L_ep = np.linalg.pinv(Lx)
+    L_ep1 = np.linalg.pinv(Lx1)
+    L_ep2 = np.linalg.pinv(Lx2)
 
-    print("Lep: ", L_ep)
-    print("e_tr", np.transpose(e))
-    print("inverse proof", np.dot(Lx, L_ep))
-    action = -lamb * np.dot(L_ep, np.transpose(e))
+    L_ep = []
+    L_ep[0:6] = np.transpose(L_ep1)
+    L_ep[6:12] = np.transpose(L_ep2)
+    L_ep = np.transpose(L_ep)
+
+    action = -lamb * np.dot(L_ep, e)
     action = action[0:4]
+
+    # ad_z = 1 - 1/(1+np.exp(-1 * sum(e*e)**0.5))
+    action[2] = action[2]
+
     action[3] = (action[0]**2+action[1]**2+action[2]**2)**(1/2)
     print("ERROR: ", e)
-    print("ACIOOOON: ", action, "\n")
+    print("ACTIOOOON: ", action, "\n")
+
+
+# plt.plot(np.arange(1, max_step+1), errors)
+# plt.show()
