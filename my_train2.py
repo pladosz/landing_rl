@@ -131,7 +131,7 @@ for step in range(max_step):
     area = np.sum(red_ctr)
     area0 = 28
 
-    Z = 0.80*(area0/area)**(1/2) - 0.143
+    Z = 0.80*(area0/area)**(1/2) - 0.2   #0.143
 
     if Z < 0.03 or Z > 1:
         Z = 0.03
@@ -173,23 +173,17 @@ for step in range(max_step):
     L_ep[6:8][:] = np.transpose(np.transpose(Lx4))
     L_ep[8:10][:] = np.transpose(np.transpose(Lx5))
 
-
     L_ep = np.linalg.pinv(L_ep)
 
     action = -lamb * np.dot(L_ep, e)[0:3]
 
     ad_z = 1 - 1/(1+np.exp(-0.001 * sum(e*e)**0.5))
     action[0] += 0.65*0
-    action[2] = ad_z*(action[2] - 0.2)
+    # action[2] = ad_z*(action[2])
     
 
 
     print("Step:", step, "| Area:", area, "| Z:", "%.3f" % Z, "| Action:", "%.7f" %action[0],"%.7f" %action[1],"%.7f" %action[2], "\n")
-    print("error: ",e)
-    print("r: ",red_r)
-    print("l: ",red_l)
-    print("u: ",red_u)
-    print("b: ",red_b)
 
 plt.figure()
 plt.plot(zs)

@@ -126,7 +126,7 @@ for step in range(max_step):
     ars.append(area)
 
 
-    lamb = 500
+    lamb = 0.0001
 
     # Defining the errors
     e = np.zeros(10)
