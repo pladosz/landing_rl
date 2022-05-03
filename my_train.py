@@ -37,132 +37,144 @@ env = gym.make(env)
 
 
 max_step = 500
+step = 0
+zs = []
+ars = []
 
 state=env.reset()
 action = [0, 0, 0]
 
-red = [5, 5]
-
 for step in range(max_step):
+    step+=1
     
     next_state, reward, done, info = env.step(action)
     im_array = next_state.transpose(1, 2, 0)
     
-
-
-    # Find the most black point
-    darkest = 500
-    black = [5, 5]
-
+    # Getting the map of red area
+    red_ctr = np.zeros((64, 64))
+    red_sum= [0, 0]
     for x in range(0, np.shape(im_array)[1]):
-        for y in range(9, np.shape(im_array)[0]-9):
-            csum = im_array[y][x][0]/3+im_array[y][x][1]/3+im_array[y][x][2]/3
-            if csum < darkest:
-                darkest = csum
-                black = np.array([y, x])
-    
+        for y in range(0, np.shape(im_array)[0]):
+            if (im_array[y][x][0] >100 and im_array[y][x][1] < 50 and im_array[y][x][2] < 50):
+                red_ctr[y][x] = 1
+                red_sum[0] += y
+                red_sum[1] += x
 
-    # Find the right red point
-    found = False
-    green_r = [5, 5]
-    for x in range(black[1], np.shape(im_array)[1]):
-        y = black[0]
+    if np.sum(red_ctr) == 0:
+        red_ctr[32][32] = 1
+    
+    red_mean =[int(red_sum[0] / np.sum(red_ctr)), int(red_sum[1] / np.sum(red_ctr))]
+
+    # Find the rightmost red point
+    red_r = [32, 32]
+    for x in range(np.shape(im_array)[1]-1, red_mean[1], -1):
+        y = red_mean[0]
         if (im_array[y][x][0] > 150 and im_array[y][x][1] < 100):
-            green_r = np.array([y, x])
+            red_r = np.array([y, x])
             break
-        # if found:
-        #     break
-
-
     
-    # Find the left red point
-    found = False
-    green_l = [5, 5]
-    for x in range(black[1], np.shape(im_array)[1]):
-        y = black[0]
-        if (im_array[y][2*black[1] - x][0] > 150 and im_array[y][2*black[1] - x][1] < 100):
-            green_l = np.array([y, x])
+    # Find the leftmost red point
+    red_l = [32, 32]
+    for x in range(0, red_mean[1]):
+        y = red_mean[0]
+        if (im_array[y][x][0] > 150 and im_array[y][x][1] < 100):
+            red_l = np.array([y, x])
             break
-        # if found:
-        #     break
 
+    # Find the uppermost red point
+    red_u = [32, 32]
+    for y in range(0, red_mean[0]):
+        x = red_mean[1]
+        if (im_array[y][x][0] > 150 and im_array[y][x][1] < 100):
+            red_u = np.array([y, x])
+            break
     
-    # # Find the first red point
-    # found = False
-    # red = [5, 5]
-    # for x in range(0, np.shape(im_array)[1]):
-    #     for y in range(9, np.shape(im_array)[0]-9):
-    #         if (im_array[y][x][0] > 150 and im_array[y][x][1] < 100):
-    #             red = np.array([y, x])
-    #             found = True
-    #         if found:
-    #             break
-    #     if found:
-    #         break
+    # Find the bottommost red point
+    red_b = [32, 32]
+    for y in range(np.shape(im_array)[0]-1, red_mean[0], -1):
+        x = red_mean[1]
+        if (im_array[y][x][0] > 150 and im_array[y][x][1] < 100):
+            red_b = np.array([y, x])
+            break
 
-
-    
-    # # Find the first green point
-    # found = False
-    # green = [5, 5]
-    # for x in range(0, np.shape(im_array)[1]):
-    #     for y in range(9, np.shape(im_array)[0]-9):
-    #         if (im_array[y][x][0] < 10 and im_array[y][x][1] > 200 and im_array[x][x][2] < 10):
-    #             green = np.array([y, x])
-    #             found = True
-    #         if found:
-    #             break
-    #     if found:
-    #         break
-
-
-
-    im_array[red[0]][red[1]] = [255, 255, 255, 255]
-    im_array[gren_r[0]][green_r[1]] = [255, 255, 255, 255]
-    im_array[green_l[0]][green_l[1]] = [255, 255, 255, 255]
+    # Checking the found points
+    im_array[red_mean[0]][red_mean[1]] = [255, 255, 255, 255]
+    im_array[red_r[0]][red_r[1]] = [255, 255, 255, 255]
+    im_array[red_l[0]][red_l[1]] = [255, 255, 255, 255]
+    im_array[red_u[0]][red_u[1]] = [255, 255, 255, 255]
+    im_array[red_b[0]][red_b[1]] = [255, 255, 255, 255]
 
     im_array[32][32] = [128, 0, 128, 255]
-    im_array[15][20] = [128, 0, 128, 255]
-    im_array[21][17] = [128, 0, 128, 255]
+    im_array[32][16] = [128, 0, 128, 255]
+    im_array[32][48] = [128, 0, 128, 255]
+    im_array[16][32] = [128, 0, 128, 255]
+    im_array[48][32] = [128, 0, 128, 255]
 
-
-    e = np.zeros(6)
-    e[0:2] = black-np.array([32, 32])
-    e[2:4] = red - np.array([15, 20])
-    e[4:6] = green - np.array([21, 17])
 
     im = Image.fromarray(im_array, 'RGBA')
     im.save("test_images/drone_view_{0}.png".format(step))
 
+    area = np.sum(red_ctr)
+    area0 = 28
+
+    Z = 0.80*(area0/area)**(1/2) - 0.143
+
+    if Z < 0.03 or Z > 1:
+        Z = 0.03
+    
+    zs.append(Z)
+    ars.append(area)
 
 
-    lamb = 0.00001
-    Z = 1
+    lamb = 500
 
-    Lx1 = np.array([[-1/Z, 0, black[1]/Z, black[0]*black[1], -(1+black[1]**2), black[0]],
-                   [0, -1/Z, black[0]/Z, 1+black[0]**2, -black[0]*black[1], -black[1]]])
+    # Defining the errors
+    e = np.zeros(10)
+    e[0:2] = np.array([32, 32]) - red_mean
+    e[2:4] = np.array([32, 48]) - red_r
+    e[4:6] = np.array([32, 16]) - red_l
+    e[6:8] = np.array([16, 32]) - red_u
+    e[8:10] = np.array([48, 32]) - red_b
 
-    Lx2 = np.array([[-1/Z, 0, red[1]/Z, red[0]*red[1], -(1+red[1]**2), red[0]],
-                   [0, -1/Z, red[0]/Z, 1+red[0]**2, -red[0]*red[1], -red[1]]])    
+    Lx1 = np.array([[-1/Z, 0, red_mean[1]/Z, red_mean[0]*red_mean[1], -(1+red_mean[1]**2), red_mean[0]],
+                   [0, -1/Z, red_mean[0]/Z, 1+red_mean[0]**2, -red_mean[0]*red_mean[1], -red_mean[1]]])
 
-    Lx3 = np.array([[-1/Z, 0, green[1]/Z, green[0]*green[1], -(1+green[1]**2), green[0]],
-                   [0, -1/Z, green[0]/Z, 1+green[0]**2, -green[0]*green[1], -green[1]]])    
+    Lx2 = np.array([[-1/Z, 0, red_r[1]/Z, red_r[0]*red_r[1], -(1+red_r[1]**2), red_r[0]],
+                   [0, -1/Z, red_r[0]/Z, 1+red_r[0]**2, -red_r[0]*red_r[1], -red_r[1]]])    
+
+    Lx3 = np.array([[-1/Z, 0, red_l[1]/Z, red_l[0]*red_l[1], -(1+red_l[1]**2), red_l[0]],
+                   [0, -1/Z, red_l[0]/Z, 1+red_l[0]**2, -red_l[0]*red_l[1], -red_l[1]]])    
+
+    Lx4 = np.array([[-1/Z, 0, red_u[1]/Z, red_u[0]*red_u[1], -(1+red_u[1]**2), red_u[0]],
+                   [0, -1/Z, red_u[0]/Z, 1+red_u[0]**2, -red_u[0]*red_u[1], -red_u[1]]])    
+
+    Lx5 = np.array([[-1/Z, 0, red_b[1]/Z, red_b[0]*red_b[1], -(1+red_b[1]**2), red_b[0]],
+                   [0, -1/Z, red_b[0]/Z, 1+red_b[0]**2, -red_b[0]*red_b[1], -red_b[1]]])  
 
 
-    L_ep = np.zeros((6, 6))
+    L_ep = np.zeros((10, 6))
     L_ep[0:2][:] = np.transpose(np.transpose(Lx1))
     L_ep[2:4][:] = np.transpose(np.transpose(Lx2))
     L_ep[4:6][:] = np.transpose(np.transpose(Lx3))
+    L_ep[6:8][:] = np.transpose(np.transpose(Lx4))
+    L_ep[8:10][:] = np.transpose(np.transpose(Lx5))
 
 
     L_ep = np.linalg.pinv(L_ep)
 
-    action = -lamb * np.dot(L_ep, e)
-    action = action[0:3]
+    action = -lamb * np.dot(L_ep, e)[0:3]
 
-    ad_z = 1 - 1/(1+np.exp(-0.01 * sum(e*e)**0.5))
-    action[2] = ad_z*(action[2] - 0.2)
+    ad_z = 1 - 1/(1+np.exp(-10 * sum(e*e)**0.5))
+    action[0] += 0.65*0
+    action[2] = ad_z * action[2]
+    
 
-    #action[3] = (action[0]**2+action[1]**2+action[2]**2)**(1/2)
-    print("ERROR: ", e)
-    print("ACTIOOOON: ", action, "\n")
+
+    print("Step:", step, "| Area:", area, "| Z:", "%.3f" % Z, "| Action:", "%.7f" %action[0],"%.7f" %action[1],"%.7f" %action[2], "\n")
+    print("error: ",e)
+
+plt.figure()
+plt.plot(zs)
+plt.figure()
+plt.plot(ars)
+plt.show()

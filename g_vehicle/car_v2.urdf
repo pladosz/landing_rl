@@ -85,6 +85,9 @@
   <material name="Black">
     <color rgba="0 0 0 1.0"/>
   </material>
+  <material name="Gray">
+    <color rgba="0.55 0.55 0 1.0"/>
+  </material>
 
   <!-- Dummy base link to lift the base up -->
 
@@ -114,7 +117,7 @@
       <geometry>
         <box size="${0.3*k_car} ${0.15*k_car} ${0.1*k_car}"/>
       </geometry>
-      <material name="Red"/>
+      <material name="Gray"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
