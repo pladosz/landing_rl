@@ -7,6 +7,7 @@ from PIL import Image
 env = 'landing-aviary-v0'
 env = gym.make(env)
 
+res = [72,72]
 max_step = 250
 step = 0
 zs = []
@@ -23,26 +24,26 @@ for step in range(max_step):
     img = next_state.transpose(1, 2, 0)
     
     # Get the map of red area
-    red_map = np.zeros((64, 64))
-    for x in range(0, 64):
-        for y in range(0, 64):
+    red_map = np.zeros(res)
+    for x in range(0, res[1]):
+        for y in range(0, res[0]):
             red_map[y][x] = (img[y][x][0] >100 and img[y][x][1] < 50 and img[y][x][2] < 50)
 
     area = np.sum(red_map)
-    area0 = 28
+    if step == 1:
+        area0 = area
 
-    if area == 0:
-        red_map[32][32] = 1
+    if area <= area0:
+        area = area0
 
-    red_mul = np.matmul(np.vstack((red_map, red_map.T)), np.arange(0, 64))/area
-    red_m = np.int_(np.rint(([np.sum(red_mul[64:128]), np.sum(red_mul[0:64])])))
-
+    red_mul = np.matmul(np.vstack((red_map, red_map.T)), np.arange(0, res[1]))/area
+    red_m = np.int_(np.rint(([np.sum(red_mul[res[1]:2*res[1]]), np.sum(red_mul[0:res[1]])])))
 
     # Find the left and rightmost red points
     found = False
     red_l = red_m
     red_r = red_m
-    for x in range(0, 63):
+    for x in range(0, res[1]-1):
         y = red_m[0]
         if (img[y][x][0] > 150 and img[y][x][1] < 100):
             red_r = np.array([y, x])
@@ -54,7 +55,7 @@ for step in range(max_step):
     found = False
     red_u = red_m
     red_b = red_m
-    for y in range(0, 63):
+    for y in range(0, res[0]-1):
         x = red_m[1]
         if (img[y][x][0] > 150 and img[y][x][1] < 100):
             red_b = np.array([y, x])
@@ -69,7 +70,9 @@ for step in range(max_step):
     r_b = red_b[0] - red_m[0]
 
     # Set the desired positions
-    des_m = np.array([32, 32])
+    des_m = np.array([int(res[0]/2+7), int(res[1]/2)])
+    print(des_m, "DESSS")
+    print('RR', r_r)
     des_r = des_m + [0, r_r]
     des_l = des_m - [0, r_l]
     des_u = des_m - [r_u, 0]
@@ -88,57 +91,53 @@ for step in range(max_step):
     img[des_u[0]][des_u[1]] = [128, 0, 128, 255]
     img[des_b[0]][des_b[1]] = [128, 0, 128, 255]
 
-    im = Image.fromarray(img, 'RGBA')
-    im.save("test_images/drone_view_{0}.png".format(step))
-
-
     Z = 0.80*(area0/area)**(1/2) - 0.143
 
-    if Z < 0.03 or Z > 1:
-        Z = 0.03
-
     lamb = 0.01
-    f = 1
+    f =  3 ** 0.5
 
     # Defining the errors
-    e = np.zeros(10)
-    e[0:2] = des_m - red_m
-    e[2:4] = des_r - red_r
-    e[4:6] = des_l - red_l
-    e[6:8] = des_u - red_u
-    e[8:10] = des_b - red_b
+    e = np.hstack((des_m - red_m,
+                   des_r - red_r,
+                   des_l - red_l,
+                   des_u - red_u,
+                   des_b - red_b))
+
+    Ls = np.array([[-f, 0, red_m[1]], 
+                   [0, -f, red_m[0]],
+
+                   [-f, 0, red_r[1]], 
+                   [0, -f, red_r[0]], 
+                   
+                   [-f, 0, red_l[1]], 
+                   [0, -f, red_l[0]],
+
+                   [-f, 0, red_u[1]], 
+                   [0, -f, red_u[0]],
+
+                   [-f, 0, red_b[1]], 
+                   [0, -f, red_b[0]]]) / Z
+
+    L_ep = np.linalg.pinv(Ls)
+
+    action = -lamb * np.dot(L_ep, e)
 
     error = np.sqrt(e.dot(e))
+
+    ad_z = 1 - 1/(1+np.exp(-0.001 * error))
+    # action[0] += 0.65*0
+    action[2] = ad_z * (action[2] - 0.2)
+
+    if Z < 0.003:
+        Z = 0.003
+        action = [0,0,0]
+
     zs.append(Z)
     ars.append(area)
     ers.append(error)
 
-
-    Lx1 = np.array([[-f/Z, 0, red_m[1]/Z],
-                   [0, -f/Z, red_m[0]/Z]])
-
-    Lx2 = np.array([[-f/Z, 0, red_r[1]/Z],
-                    [0, -f/Z, red_r[0]/Z]])    
-
-    Lx3 = np.array([[-f/Z, 0, red_l[1]/Z],
-                    [0, -f/Z, red_l[0]/Z]])    
-
-    Lx4 = np.array([[-f/Z, 0, red_u[1]/Z],
-                    [0, -f/Z, red_u[0]/Z]])    
-
-    Lx5 = np.array([[-f/Z, 0, red_b[1]/Z],
-                    [0, -f/Z, red_b[0]/Z]])  
-
-
-    L_ep = np.vstack((Lx1, Lx2, Lx3, Lx4, Lx5))
-
-    L_ep = np.linalg.pinv(L_ep)
-
-    action = -lamb * np.dot(L_ep, e)[0:3]
-
-    ad_z = 1 - 1/(1+np.exp(-0.001 * error))
-    # action[0] += 0.65*0
-    action[2] = ad_z*(action[2] - 0.2)
+    im = Image.fromarray(img, 'RGBA')
+    im.save("test_images/drone_view_{0}.png".format(step))
 
     print("Step:", step, "| Area:", area, "| Z:", "%.3f" % Z, "| Action:", "%.7f" %action[0],"%.7f" %action[1],"%.7f" %action[2], "\n")
 
