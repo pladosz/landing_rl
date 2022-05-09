@@ -129,7 +129,7 @@ for step in range(max_step):
 
     L_ep = np.linalg.pinv(Ls)
 
-    action = -lamb * np.dot(L_ep, e.T)
+    action = np.dot(L_ep, (-lamb * e.T))
 
     error = np.linalg.norm(e)
 
