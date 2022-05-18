@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation
 from PIL import Image
 import pybullet
 
-env = gym.make('landing-aviary-v0')
+env = gym.make('landing-aviary-v0', gui = True)
 pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_SHADOWS,0)
 
 os.system('rm -rf /home/user/landing/landing_rl/test_images')
@@ -21,13 +21,10 @@ action = [0, 0, 0]
 
 zs = []
 zsm=[]
-ars = []
-arsm = []
 e_x = []
 e_y = []
 
 lamb = 1.5
-
 # Initial position of the vehicle
 p_vhc_0 = np.array([0.2, 0.2, -0.719])
 
@@ -38,7 +35,6 @@ for step in range(max_step):
     img, reward, done, info = env.step(action)
     res = np.shape(img)[0:2]
     xyz = info[0]
-    rpy = info[1]
 
     # Rotation Matrix from the world to drone frame
     R = Rotation.from_quat(info[2]).as_matrix()
@@ -61,8 +57,6 @@ for step in range(max_step):
 
     e_ = np.array([(res[1]-1)/2 - red_m[0],       # in uav frame, pixels
                    (res[0]-1)/2 - red_m[1]])
-    print('error:', e_, '\n')
-
 
     if step == 0:
         area0 = area_temp
@@ -83,24 +77,21 @@ for step in range(max_step):
     e = np.dot(R, e_uav)
 
     # Ascending velocity damping factor
-    ad_z = 1 - 1/(1+np.exp(-0.00001 * np.linalg.norm(e[0:2])))
+    ad_z = 1 - 1/(1+np.exp(-0.01 * np.linalg.norm(e)))
 
     # vz = vz_0 * ad_z
-    vz = -0.1
-    vx = 0.1*lamb*e[0] - vz * e[0]/Z
+    vz = 0.5 * e[2]
+    vx = 0.1*lamb*e[0] - vz * e[0]/Z + 0.2
     vy = 0.1*lamb*e[1] - vz * e[1]/Z
 
     action = np.array([vx, vy, vz])
 
     zs.append(Z)
     zsm.append(xyz[2]-0.281)
-    ars.append(area)
-    arsm.append(area0*(0.719/(xyz[2]-0.281))**2)
-    e_x.append(abs(e[0]))
-    e_y.append(abs(e[1]))
+    e_x.append(e[0])
+    e_y.append(e[1])
 
-    # pybullet.addUserDebugLine(xyz, xyz + [0.01*e_[0], 0.01*e_[1], 0], lifeTime=0.1,lineColorRGB = [128,0,128])
-    pybullet.addUserDebugLine(xyz, xyz + [e_uav[0], e_uav[1], 0], lifeTime=0.1,lineColorRGB = [150,100,0])
+    pybullet.addUserDebugLine(xyz, xyz + action, lifeTime=0.1,lineColorRGB = [150,100,0])
     pybullet.addUserDebugLine(xyz, xyz + e, lifeTime=0.1,lineColorRGB = [0,0,0])
     pybullet.addUserDebugText('{}'.format(step), (1,1,0), textColorRGB = (0,0,0),lifeTime  =0.1)
 
@@ -110,19 +101,14 @@ for step in range(max_step):
 
     im = Image.fromarray(img, 'RGBA')
     im.save("test_images/drone_view_{0}.png".format(step))
-    # print("Step:", step, "| Area:", area, " | Z:", "%.3f" % Z, "| Action:", "%.7f" %action[0],"%.7f" %action[1],"%.7f" %action[2], "\n\n")
+    print("Step:", step, " | Z:", "%.3f" % Z, "| Action:", "%.7f" %action[0],"%.7f" %action[1],"%.7f" %action[2], "\n\n")
 
-plt.subplot(3, 1, 1)
+plt.subplot(2, 1, 1)
 plt.plot(zs, label='Z')
 plt.plot(zsm, label='Real Z')
 plt.legend()
 
-plt.subplot(3, 1, 2)
-plt.plot(ars, label='Area')
-plt.plot(arsm, label='Real Area')
-plt.legend()
-
-plt.subplot(3, 1, 3)
+plt.subplot(2, 1, 2)
 plt.plot(e_x, label='e_x')
 plt.plot(e_y, label='e_y')
 plt.legend()
