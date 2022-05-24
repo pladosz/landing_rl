@@ -24,43 +24,40 @@ zsm=[]
 e_x = []
 e_y = []
 
-lamb = 1.5
+lamb = 0.15
 # Initial position of the vehicle
-p_vhc_0 = np.array([0.2, 0.2, -0.719])
+p_vhc_0 = np.array([0.2, 0.2, 0.281])
 
-Z = 0.719
+Z = 1-p_vhc_0[2]
 
 for step in range(max_step):
     # Take the step and extract data
     img, reward, done, info = env.step(action)
-    res = np.shape(img)[0:2]
+    res = np.array(img.shape[0:2])
     xyz = info[0]
 
     # Rotation Matrix from the world to drone frame
     R = Rotation.from_quat(info[2]).as_matrix()
     
-    # Get the map of red area
+    # Get the map of the red area
     red_map = np.zeros((res[0],res[1]))
     for x in range(0, res[1]):
         for y in range(0, res[0]):
-            red_map[y][x] = (img[y][x][0] >100 and img[y][x][1] < 50 and img[y][x][2] < 50)
+            red_map[y][x] = ((img[y][x][0] > 100 and img[y][x][1] < 50 and img[y][x][2] < 50) or 
+                             (img[y][x][0] < 50  and img[y][x][1] < 50 and img[y][x][2] < 50))
 
-    # Get Z and Area approximations
+    # Estimate pad coordinate and Z
     area_temp = np.sum(red_map)
-
-    if area_temp <= 10:
-        action = [0,0,0.1]
-        continue
 
     red_mul = np.dot(np.vstack((red_map, red_map.T)), np.arange(0, res[0]))/area_temp
     red_m = np.array([np.sum(red_mul[res[0]:2*res[0]]), np.sum(red_mul[0:res[0]])])
 
-    e_ = np.array([(res[1]-1)/2 - red_m[0],       # in uav frame, pixels
-                   (res[0]-1)/2 - red_m[1]])
+    e_ = (res-1)/2-red_m
 
     if step == 0:
         area0 = area_temp
         area = area0
+        # Get focal lengths
         f_x = abs(Z * e_[0] / p_vhc_0[0])
         f_y = abs(Z * e_[1] / p_vhc_0[1])
 
@@ -68,21 +65,24 @@ for step in range(max_step):
         area = area_temp
         Z = 0.719*(area0/area)**(1/2)-0.05
 
+    if area_temp <= area0*0.8:
+        action = [0,0,0.5]
+        continue
+
+    # Get error in uav and world frames, in meters
     x = e_[0] * Z / f_x
     y = e_[1] * Z / f_y
     z = (-Z - R[2][0]*x-R[2][1]*y)/R[2][2]
     
-    e_uav = np.array([x, y, z])                 # in uav frame, meters
-
+    e_uav = np.array([x, y, z])
     e = np.dot(R, e_uav)
 
     # Ascending velocity damping factor
-    ad_z = 1 - 1/(1+np.exp(-0.01 * np.linalg.norm(e)))
+    ad_z = 1 - 1/(1+np.exp(-0.01 * np.linalg.norm(e[0:2])))
 
-    # vz = vz_0 * ad_z
-    vz = 0.5 * e[2]
-    vx = 0.1*lamb*e[0] - vz * e[0]/Z + 0.2
-    vy = 0.1*lamb*e[1] - vz * e[1]/Z
+    vz = 0.5 * e[2] - 0.1 * ad_z
+    vx = lamb*e[0] - vz * e[0]/Z + 0.2
+    vy = lamb*e[1] - vz * e[1]/Z
 
     action = np.array([vx, vy, vz])
 
@@ -102,6 +102,10 @@ for step in range(max_step):
     im = Image.fromarray(img, 'RGBA')
     im.save("test_images/drone_view_{0}.png".format(step))
     print("Step:", step, " | Z:", "%.3f" % Z, "| Action:", "%.7f" %action[0],"%.7f" %action[1],"%.7f" %action[2], "\n\n")
+    
+    if pybullet.getContactPoints(bodyA = 1) != ():
+        break
+
 
 plt.subplot(2, 1, 1)
 plt.plot(zs, label='Z')
