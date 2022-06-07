@@ -52,7 +52,7 @@ for step in range(max_step):
     red_mul = np.dot(np.vstack((red_map, red_map.T)), np.arange(0, res[0]))/area_temp
     red_m = np.array([np.sum(red_mul[res[0]:2*res[0]]), np.sum(red_mul[0:res[0]])])
 
-    e_ = (res-1)/2-red_m
+    e_ = (res-1)/2-red_m    # pixel frame
 
     if step == 0:
         area0 = area_temp
