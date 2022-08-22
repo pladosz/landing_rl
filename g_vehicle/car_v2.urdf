@@ -6,8 +6,8 @@
   <!-- Size factors -->
   <xacro:property name="k_overall" value="0.1" />   <!-- Overall size factor (0.1)-->
   <xacro:property name="k_car" value="${10*k_overall}" />   <!-- Car size factor (10)-->
-  <xacro:property name="a_base" value="${2*k_overall}" />  <!-- Base side length (2) -->
-  <xacro:property name="r_circle" value="${0.5*k_overall}" />  <!-- Circle radius (0.5) -->
+  <xacro:property name="a_base" value="${5*2*k_overall}" />  <!-- Base side length (2) -->
+  <xacro:property name="r_circle" value="${7*0.5*k_overall}" />  <!-- Circle radius (0.5) -->
   <xacro:property name="h_h" value="1" /> <!-- H size factor (if 1, height = r_circle)-->
   <xacro:property name="h_w" value="1" /> <!-- H width factor (1)-->
   <xacro:property name="t" value="${0.001}" /> <!-- H font thickness (0.005) -->
@@ -21,7 +21,7 @@
   </material>
 
   <material name="circle_color">
-    <color rgba="1.0 0.0 0.0 1.0"/>
+    <color rgba="1.0 1.0 1.0 1.0"/>
   </material>
 
   <!-- Color for Gazebo --> 

@@ -27,10 +27,10 @@ class RDPG():
         self.target_policy_net = DPG_PolicyNetworkGRU(state_space, action_space, self.hidden_1, self.hidden_2, self.hidden_3, args.n_layers, args.drop_prob).to(device)
 
         # two-branch network structure as in 'Sim-to-Real Transfer of Robotic Control with Dynamics Randomization'
-        # self.qnet = QNetworkLSTM(state_space, action_space, hidden_dim).to(device)
-        # self.target_qnet = QNetworkLSTM(state_space, action_space, hidden_dim).to(device)
-        # self.policy_net = DPG_PolicyNetworkLSTM(state_space, action_space, hidden_dim).to(device)
-        # self.target_policy_net = DPG_PolicyNetworkLSTM(state_space, action_space, hidden_dim).to(device)
+        # self.qnet = QNetworkLSTM(state_space, action_space, hidden_dim=100).to(device)
+        # self.target_qnet = QNetworkLSTM(state_space, action_space, hidden_dim=100).to(device)
+        # self.policy_net = DPG_PolicyNetworkLSTM(state_space, action_space, hidden_dim=100).to(device)
+        # self.target_policy_net = DPG_PolicyNetworkLSTM(state_space, action_space, hidden_dim=100).to(device)
 
         print('Q network: ', self.qnet)
         print('Policy network: ', self.policy_net)
@@ -60,13 +60,24 @@ class RDPG():
         gamma = self.discount
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.replay_buffer.sample(batch_size)
         # print('sample:', state, action,  reward, done)
-#        print(state[0][0][0], ",       ", len(state[1]))
+        # print(state[0][0][0], ",       ", len(state[1]))
+        #state = np.array(state)
+        state = np.concatenate(state, axis=0 )
+        # print("state : ", state.shape)
         state = torch.FloatTensor(state).to(device)
-        state = state.squeeze()
-#        print(state.size())
+        #state = state.squeeze()
+        next_state = np.concatenate(next_state, axis=0)
+        # print("next state : ", next_state.shape)
         next_state = torch.FloatTensor(next_state).to(device)
-        next_state = next_state.squeeze()
+        # next_state = next_state.squeeze()
+        action     = np.concatenate(action, axis=0 )
+        # print("action : ", action.shape)
+        # exit()
         action     = torch.FloatTensor(action).to(device)
+        # print("&&&&&&&&&&&&&&&&&&&&&&&")
+        # print(np.shape(last_action))
+        # print(last_action)
+        last_action = np.concatenate(last_action, axis=0 )
         last_action     = torch.FloatTensor(last_action).to(device)
         reward     = torch.FloatTensor(reward).unsqueeze(-1).to(device)  
         done       = torch.FloatTensor(np.float32(done)).unsqueeze(-1).to(device)
@@ -76,19 +87,32 @@ class RDPG():
 #        predict_q, _ = self.qnet(state, action, hidden_in) # for q 
 #        print(hidden_in[0].size())
 #        new_action, _ = self.policy_net.evaluate(state, hidden_in) # for policy
-        new_next_action, _ = self.target_policy_net.evaluate(next_state, hidden_out)  # for q
+        predict_q, _ = self.qnet(state, action, hidden_in) # for q
+        new_next_action, _ = self.target_policy_net.evaluate(next_state, hidden_out)  # for q 
+        new_action, _ = self.policy_net.evaluate(state, hidden_in)
+        predict_new_q, _ = self.qnet(state, new_action, hidden_in) # for policy. as optimizers are separated, no detach for q_h_in is also fine
         predict_target_q, _ = self.target_qnet(next_state, new_next_action, hidden_out)  # for q
         target_q = reward+(1-done)*gamma*predict_target_q # for q
 
-#        predict_new_q, _ = self.qnet(state, new_action, hidden_in) # for policy. as optimizers are separated, no detach for q_h_in is also fine
+
         # reward = reward_scale * (reward - reward.mean(dim=0)) /reward.std(dim=0) # normalize with batch mean and std
 
         # Critic update
-        self.q_optimizer.zero_grad()
+        # self.q_optimizer.zero_grad()
 
-        predict_q, _ = self.qnet(state, action, hidden_in) # for q 
-        q_loss = self.q_criterion(predict_q, target_q.detach()) # + random.uniform(-1e-10, 1e-10)
-#        q_loss.backward(retain_graph=True)  # no need for retain_graph here actually
+        # predict_q, _ = self.qnet(state, action, hidden_in) # for q 
+        
+        # print(self.qnet.linear4.weight)
+        # A = copy.deepcopy(self.qnet.linear4.weight)
+        q_loss = self.q_criterion(predict_q, target_q.detach())
+
+
+        
+        self.q_optimizer.zero_grad()
+        q_loss.backward()
+        self.q_optimizer.step()
+        # print("qnet: ",A==self.qnet.linear4.weight)
+        
         if q_loss != q_loss:
             print("q_loss: ", q_loss)
             print("-----------------------\n", "predict_q: ", predict_q)
@@ -111,26 +135,19 @@ class RDPG():
             print(new_next_action != new_next_action)
             print("hidden_out: ", hidden_out)
             print(hidden_out != hidden_out)
-        q_loss.backward()
-        self.q_optimizer.step()
 
         # Actor update
-        self.policy_optimizer.zero_grad()
+        # self.policy_optimizer.zero_grad()
         new_action, _ = self.policy_net.evaluate(state, hidden_in) # for policy
         predict_new_q, _ = self.qnet(state, new_action, hidden_in) # for q 
 
-#        self.q_optimizer.zero_grad()
+
         policy_loss = -torch.mean(predict_new_q)
-#        self.policy_optimizer.zero_grad()
-
-        # train qnet
-#        q_loss.backward(retain_graph=True)  # no need for retain_graph here actually
+        self.policy_optimizer.zero_grad()
         policy_loss.backward()
-
-#        self.q_optimizer.step()
-
-        # train policy_net     
         self.policy_optimizer.step()
+
+        # print("policynet: ",A==self.policy_net.linear2.weight)
 
         # update the target_qnet
         if self.update_cnt%target_update_delay==0:

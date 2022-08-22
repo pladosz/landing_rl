@@ -16,6 +16,7 @@ class Evaluator(object):
         self.n_layers = args.n_layers
         self.num_episodes = args.validate_episodes
         self.max_episode_length = args.max_episode_length
+        self.gamma = args.discount
 #        self.window_length = args.window_length
         self.save_path = args.model_path
         self.interval = args.validate_interval
@@ -48,30 +49,45 @@ class Evaluator(object):
 
             # start episode
             done = False
+            reward_p = 0
 
             hidden_out = torch.zeros([self.n_layers, 1, self.hidden_in], dtype=torch.float).cuda()
+
+            # shaping_p = 2.463458877154892
 
             while not done:
                 hidden_in = hidden_out
                 # basic operation, action ,reward, blablabla ...
                 action, hidden_out = policy(observation, hidden_in)
-#                print("current action:" + str(action))
-                observation, reward, done, info = env.step(action)
+                # print("current action:" + str(action))
+                observation, reward, done, info = env.step(np.hstack((action,np.array(-0.5))))
+                #observation, reward, done, info = env.step(action)
+                
+                # next_state, shaping, done, info = env.step(action)
+                # reward = shaping - shaping_p
+                # shaping_p = shaping
+
 #                episode_memory.append(observation)
 #                observation = episode_memory.getObservation(self.window_length, observation)
                 # Change the episode when episode_steps reach max_episode_length
+                
                 if self.max_episode_length and episode_steps >= self.max_episode_length -1:
                     #env.render(mode='human')
                     done = True
 
                 if visualize:
-                    pass
                     #env.render(mode='human')
+                    # env.render()
+                    pass
 
                 # update
-                episode_reward += reward
+                episode_reward += (reward-reward_p)#*(self.gamma**episode_steps)
+                if episode_steps == 0:
+                    episode_reward = 0.
+                # episode_reward += reward
                 episode_steps += 1
                 time.sleep(self.pause_t)
+                reward_p = reward
 
                 
 #            print("goal (x: " + str(env.goal_x) + ", y: " + str(env.goal_y) + ")")

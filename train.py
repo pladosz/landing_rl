@@ -28,7 +28,7 @@ import argparse
 from gym import spaces
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter()
+# writer = SummaryWriter()
 
 #pybullet imports
 from gym_pybullet_drones.utils.Logger import Logger
@@ -48,27 +48,27 @@ if __name__ == '__main__':
     parser.add_argument('--env', default='gym_gazebo2_px4:px4-landing-v1', type=str, help='open-ai gym environment')
 
     # Set network parameter
-    parser.add_argument('--hidden_1', default=300, type=int, help='hidden num of first fully connect layer')
-    parser.add_argument('--hidden_2', default=64, type=int, help='input num of GRU layer')
-    parser.add_argument('--hidden_3', default=64, type=int, help='output num of GRU layer')
+    parser.add_argument('--hidden_1', default=200, type=int, help='hidden num of first fully connect layer')
+    parser.add_argument('--hidden_2', default=100, type=int, help='input num of GRU layer')
+    parser.add_argument('--hidden_3', default=100, type=int, help='output num of GRU layer')
     parser.add_argument('--n_layers', default=1, type=int, help='number of stack for hidden layer')
-    parser.add_argument('--rate', default=0.0001, type=float, help='learning rate')
-    parser.add_argument('--prate', default=0.00001, type=float, help='policy net learning rate (only for DDPG)')
+    parser.add_argument('--rate', default=0.0001, type=float, help='learning rate')#0.0001
+    parser.add_argument('--prate', default=0.00001, type=float, help='policy net learning rate (only for DDPG)')#0.00001
     parser.add_argument('--discount', default=0.95, type=float, help='Discount factor for next Q values')
-    parser.add_argument('--init_w', default=0.003, type=float, help='Initial network weight')
-    parser.add_argument('--tau', default=0.0001, type=float, help='moving average for target network')
-    parser.add_argument('--drop_prob', default=0.2, type=float, help='dropout_probability')
+    parser.add_argument('--init_w', default=0.003, type=float, help='Initial network weight')#0.003
+    parser.add_argument('--tau', default=0.0001, type=float, help='moving average for target network')#0.0001
+    parser.add_argument('--drop_prob', default=0., type=float, help='dropout_probability')#0.2
 
     # Set learning parameter
-    parser.add_argument('--rbsize', default=20000, type=int, help='Memory size')
+    parser.add_argument('--rbsize', default=20000, type=int, help='Memory size')#20000
     parser.add_argument('--bsize', default=128, type=int, help='minibatch size')
     parser.add_argument('--blength', default=1, type=int, help='minibatch sequence length')
-    parser.add_argument('--warmup', default=20000, type=int, help='warmup size (steps or episodes)')
-    parser.add_argument('--max_episodes', default=100000, type=int, help='Number of episodes')
-    parser.add_argument('--max_episode_length', default=300, type=int, help='Number of steps for each episode')
-    parser.add_argument('--validate_episodes', default=5, type=int, help='Number of episodes to perform validation')
-    parser.add_argument('--validate_interval', default=1000, type=int, help='Validation episode interval')
-    parser.add_argument('--epsilon_rate', default=0.1, type=float, help='linear decay of exploration policy')
+    parser.add_argument('--warmup', default= 20000, type=int, help='warmup size (steps or episodes)')#20000
+    parser.add_argument('--max_episodes', default=100000, type=int, help='Number of episodes')#100000
+    parser.add_argument('--max_episode_length', default=1200, type=int, help='Number of steps for each episode')#300
+    parser.add_argument('--validate_episodes', default=10, type=int, help='Number of episodes to perform validation')
+    parser.add_argument('--validate_interval', default=100, type=int, help='Validation episode interval')#1000
+    parser.add_argument('--epsilon_rate', default=0.005, type=float, help='linear decay of exploration policy')
 
     #etc
     parser.add_argument('--pause_time', default=0, type=float, help='Pause time for evaluation')
@@ -82,18 +82,21 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    env = gym.make(args.env)
+    env = gym.make(args.env,disable_env_checker=True)
+    # env = gym.make(args.env)
     action_space = env.action_space
     state_space  = env.observation_space
     # hidden_dim = args.hidden
     # explore_steps = 0  # for random exploration
     batch_size = args.bsize  # each sample in batch is an episode for gru policy (normally it's timestep)
     update_itr = 1  # update iteration
+    gamma = args.discount
     n_layers = args.n_layers
     replay_buffer_size = args.rbsize
     replay_buffer = ReplayBufferGRU(replay_buffer_size)
-    args.model_path = get_output_folder(args.model_path, args.env)
-    args.model_path_current = get_output_folder(args.model_path_current, args.env)
+    if args.mode == 'train':
+        args.model_path = get_output_folder(args.model_path, args.env)
+        args.model_path_current = get_output_folder(args.model_path_current, args.env)
     torch.autograd.set_detect_anomaly(True)
 
     alg = RDPG(args, replay_buffer, state_space, action_space)
@@ -101,8 +104,9 @@ if __name__ == '__main__':
 
     
     if args.mode == 'train':
+        writer = SummaryWriter()
         # alg.load_model(model_path)
-#        alg.load_model('model/rdpg_pf_seq_1/gym_ste:StePFilterConvHardEnv-v0-run9')
+        # alg.load_model('model/rdpg_pf_seq_1/gym_ste:StePFilterConvHardEnv-v0-run9')
         # hyper-parameters
         max_episodes  = args.max_episodes
         max_steps   = args.max_episode_length
@@ -110,7 +114,7 @@ if __name__ == '__main__':
         total_steps = 0
         epsilon_steps = int(max_episodes*max_steps*args.epsilon_rate)
         rewards=[]
-        highest_reward = -100
+        highest_reward = -100000
         update_bool = False
         validate_start = 0
         starting_episode = 0
@@ -127,7 +131,8 @@ if __name__ == '__main__':
             policy_loss_list=[]
             state = env.reset()
             episode_reward = 0
-            last_action = [0, 0, 0, 0]
+            last_action = [0, 0]
+            # last_action = [0, 0]
 #            episode_state = []
 #            episode_action = []
 #            episode_last_action = []
@@ -136,6 +141,8 @@ if __name__ == '__main__':
 #            episode_done = []
             hidden_out = torch.zeros([n_layers, 1, args.hidden_3], dtype=torch.float).cuda()
             # initialize hidden state for gru, (hidden, cell), each is (layer, batch, dim)
+
+            shaping_p = 0
 
             batch_length = 0
 
@@ -155,15 +162,25 @@ if __name__ == '__main__':
                     prRed('Highest reward: {}, Validate_reward: {}'.format(highest_reward, validate_reward))
                     highest_reward = validate_reward
                     alg.save_model(args.model_path)
-            
+                continue
+
             for step in range(max_steps):
                 hidden_in = hidden_out
                 noise_level = max((epsilon_steps - total_steps)/epsilon_steps, 0)
-                action, hidden_out = alg.policy_net.get_action(state, hidden_in, noise_level)
-                next_state, reward, done, info = env.step(action)
-                #print(np.max(next_state))
-                im = Image.fromarray(next_state.transpose(1, 2, 0), 'RGBA')
-                im.save("test_images/drone_view_{0}.png".format(step))
+                #############################################################
+                action, hidden_out = alg.policy_net.get_action(state, hidden_in, noise_level)#noise_level
+                # next_state, reward, done, info = env.step(np.hstack((action,np.array(-0.5))))
+                ###########################################################
+                # action = alg.policy_net.get_action(state, noise_level)
+                # next_state, reward, done, info = env.step(action)
+
+                next_state, shaping, done, info = env.step(np.hstack((action,np.array(-0.5))))
+                #next_state, shaping, done, info = env.step(action)
+                # next_state, reward, done, info = env.step(action)
+                reward = shaping - shaping_p
+                shaping_p = shaping
+                
+                # print("state: ",state)
 
 
                 if batch_length==0:
@@ -175,6 +192,9 @@ if __name__ == '__main__':
                     batch_done = []
                     ini_hidden_in = hidden_in
                     ini_hidden_out = hidden_out
+                
+                if step == 0:
+                    reward = 0.
 
                 batch_state.append(state)
                 batch_action.append(action)
@@ -183,7 +203,8 @@ if __name__ == '__main__':
                 batch_next_state.append(next_state)
                 batch_done.append(done)
 
-                episode_reward.append(reward)
+                episode_reward.append(reward)#*(gamma**step))
+                # episode_reward.append(reward)
 
 #                print(len(ini_hidden_in))
 
@@ -202,7 +223,6 @@ if __name__ == '__main__':
                     batch_length = 0
                     replay_buffer.push(ini_hidden_in, ini_hidden_out, batch_state, batch_action, batch_last_action, \
                                        batch_reward, batch_next_state, batch_done)
-#                    replay_buffer.get_length()
 
                 if update_bool:
                     for _ in range(update_itr):
@@ -213,53 +233,80 @@ if __name__ == '__main__':
 
                 if done:  # should not break for gru cases to make every episode with same length
                     batch_length = 0
-                    break        
-
-            exit()
+                    break    
+            print(noise_level) 
             print('Eps: ', i_episode, '| Reward: ', np.sum(episode_reward), '| Loss: ', np.average(q_loss_list), np.average(policy_loss_list), 
                   " | total_step: ", total_steps, " | buffer length: ", replay_buffer.get_length())
             if i_episode % args.save_interval == 0:
                 alg.save_checkpoint(args.model_path_checkpoint, i_episode,  np.sum(episode_reward), epsilon_steps, total_steps, frame_idx, batch_length)
+
+            if i_episode>=100:
+                writer.add_scalar("Reward", np.sum(episode_reward), i_episode)
+                writer.add_scalar("q_loss", np.average(q_loss_list), i_episode)
+                writer.add_scalar("policy_loss", np.average(policy_loss_list), i_episode)
+                writer.flush()
+
 #            replay_buffer.push(ini_hidden_in, ini_hidden_out, episode_state, episode_action, episode_last_action, \
 #                episode_reward, episode_next_state, episode_done)
 
 #            rewards.append(np.sum(episode_reward))
     
     if args.mode == 'test':
-        test_episodes = 50
-        max_steps=300
-        alg.load_model('model/rdpg_pf_center_very_hard_current/gym_ste:StePFilterConvCenterVeryHardEnv-v0-run1')
-        #alg.load_model(model_path)
+        test_episodes = 1 #1 for plot
+        max_steps=600
+
+        save_fig = True
+
+        #alg.load_model('model/rdpg_pf_center_very_hard_current/gym_ste:StePFilterConvCenterVeryHardEnv-v0-run1')
+        #alg.load_model(args.model_path)
+        #'model/rdpg_pf_dir_vel_no_penalty_center_extreme_noisy_1004/landing-aviary-v0-run392'
+        path = 'model/rdpg_pf_dir_vel_no_penalty_center_extreme_noisy_1004_current/landing-aviary-v0-run483'
+        alg.load_model(path)
         total_reward = 0
+
+        states = np.empty((0,7))
 
         for episode in range(test_episodes):
             # reset at the start of episode
-            env.close()
+            #env.close()
             observation = env.reset()
             #env.render_background(mode='human')
             episode_steps = 0
             episode_reward = 0.
             
             done = False
+            reward_p = 0
 
             hidden_out = torch.zeros([n_layers, 1, args.hidden_3], dtype=torch.float).cuda()
             while not done:
                 hidden_in = hidden_out
                 # basic operation, action ,reward, blablabla ...
 #                action, hidden_out = policy(observation, hidden_in)
+                # print("OBS : ",observation)
                 action, hidden_out= alg.policy_net.get_action(observation, hidden_in, noise_scale=0.0)  # no noise for testing
-#                print("current action:" + str(action))
+                # action = np.array([0.9,-0.01,-0.7])
+                print(action)
+                # observation, reward, done_, info = env.step(np.hstack((action,np.array(-0.5))))
                 observation, reward, done, info = env.step(action)
-#                episode_memory.append(observation)
-#                observation = episode_memory.getObservation(self.window_length, observation)
-                # Change the episode when episode_steps reach max_episode_length
-                
-                #env.render(mode='human')
+                if args.max_episode_length and episode_steps >= args.max_episode_length -1:
+                    done = True
+
+                states = np.append(states,np.array([observation]),axis=0)
+                # print(action)
+                # print("OBS : ",observation)
+
+
 
                 # update
-                episode_reward += reward
+                episode_reward += (reward - reward_p)#*(gamma**episode_steps)
+                if episode_steps == 0:
+                    episode_reward = 0.
+                # episode_reward += reward 
                 episode_steps += 1
-                time.sleep(args.pause_time)
+                # time.sleep(args.pause_time)
+                # time.sleep(1/48)
+                # print("eps : ", episode_steps)
+                reward_p = reward
             
             prRed('[Evaluate] Episode_{:07d}: mean_reward:{}'.format(episode, episode_reward))
             total_reward += episode_reward
@@ -267,3 +314,38 @@ if __name__ == '__main__':
         mean_reward = total_reward/test_episodes
         prGreen('[Evaluate] Episode_{:07d}: mean_reward:{}'.format(episode, mean_reward))
 
+        if save_fig:
+            ###plot###
+            pos_fig, (pos,vel,zpos,zvel) = plt.subplots(4,1)
+            pos_fig.subplots_adjust(hspace=0.5)
+
+            dt = 1/24
+            t = np.arange(0,episode_steps*dt,dt)
+
+            pos.plot(t,states[:,0]*75,t,states[:,1]*75)
+            pos.set_xlabel('time(s)')
+            pos.set_ylabel('position(m)')
+            pos.grid(True)
+
+            vel.plot(t,states[:,3]*3,t,states[:,4]*3)
+            vel.set_xlabel('time(s)')
+            vel.set_ylabel('velosity(m/s)')
+            vel.grid(True)
+
+            zpos.plot(t,states[:,2]*25)
+            zpos.set_xlabel('time(s)')
+            zpos.set_ylabel('z_position(m)')
+            zpos.grid(True)
+
+            zvel.plot(t,states[:,5]*3)
+            zvel.set_xlabel('time(s)')
+            zvel.set_ylabel('z_velosity(m/s)')
+            # zvel.margins(x=0, y=-0.6)
+            grid_points = [-0.5, 0., 0.5, 1]
+            zvel.yaxis.set_ticks(grid_points)
+            zvel.grid(True)
+
+
+            # plt.savefig('{}/validate_reward'.format(path)+'.png')
+
+            plt.show()

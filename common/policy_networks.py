@@ -19,11 +19,21 @@ class PolicyNetworkBase(nn.Module):
         self._action_space = action_space
         self._action_shape = action_space.shape
         if len(self._action_shape) < 1:  # Discrete space
-            self._action_dim = action_space.n
+            self._action_dim = 2#action_space.n
         else:
-            self._action_dim = self._action_shape[0]
+            self._action_dim = 2#self._action_shape[0]
 #        self.action_range = action_range
+        self.apply(self._init_weights)
 
+    def _init_weights(self, module):
+        if isinstance(module, nn.Embedding):
+            module.weight.data.normal_(mean=0.0, std=1.0)
+            if module.padding_idx is not None:
+                module.weight.data[module.padding_idx].zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(0.1)
+    
     def forward(self):
         pass
     
@@ -49,16 +59,24 @@ class DPG_PolicyNetworkGRU(PolicyNetworkBase):
 #        self.hidden_2 = hidden_2
 #        self.hidden_3 = hidden_3
 
-        self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
-        self.gru1 = nn.GRU(1024, hidden_3, n_layers, dropout=drop_prob)
+        # self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4)
+        # self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        # self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        # self.gru1 = nn.GRU(1024, hidden_3, n_layers, dropout=drop_prob)
 #        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = nn.Linear(hidden_3, self._action_dim) # output dim = dim of action
-
+        # self.linear3 = nn.Linear(hidden_3, self._action_dim) # output dim = dim of action
+#################################################################################
+        self.linear1 = nn.Linear(self._state_dim, hidden_1)
+        #torch.nn.init.kaiming_uniform_(self.linear1.weight)
+        self.linear2 = nn.Linear(hidden_1, hidden_2)
+        #torch.nn.init.kaiming_uniform_(self.linear1.weight)
+        # self.gru1 = nn.GRU(hidden_2, hidden_2, n_layers, dropout=drop_prob)
+        self.linear3 = nn.Linear(hidden_2, self._action_dim)
+        #torch.nn.init.xavier_uniform_(self.linear1.weight)
+#################################################################################
         # weights initialization
-        self.linear3.weight.data.uniform_(-init_w, init_w)
-        self.linear3.bias.data.uniform_(-init_w, init_w)
+        # self.linear3.weight.data.uniform_(-init_w, init_w)
+        # self.linear3.bias.data.uniform_(-init_w, init_w)
     
 
     def forward(self, state, hidden_in):
@@ -73,26 +91,42 @@ class DPG_PolicyNetworkGRU(PolicyNetworkBase):
         #activation=F.relu
         # single branch
         # = torch.cat([state], -1)
+        # x = state
+        # x = F.relu(self.conv1(x))   # lstm_branch: sequential data
+        # x = F.relu(self.conv2(x))
+        # x = F.relu(self.conv3(x))
+        # x = torch.flatten(x, start_dim = 1)
+        # x = x.unsqueeze(0)
+        # hidden only for initialization, later on hidden states are passed automatically for sequential data
+        # x,  lstm_hidden = self.gru1(x, hidden_in)    # no activation after lstm
+#        x = activation(self.linear2(x))
+        # x = F.tanh(self.linear3(x))
+        # x = x.permute(1,0,2)  # permute back
+        # return x, lstm_hidden    # lstm_hidden is actually tuple: (hidden, cell)
+        #############################################
         x = state
-        x = F.relu(self.conv1(x))   # lstm_branch: sequential data
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
+        x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))
+        # x = torch.flatten(x, start_dim = 1)
+        # x = x.unsqueeze(0)
+        # x,  lstm_hidden = self.gru1(x, hidden_in)
+        lstm_hidden = hidden_in
+        # x = self.linear3(x)
+        x = torch.tanh(self.linear3(x))
         x = torch.flatten(x, start_dim = 1)
         x = x.unsqueeze(0)
-        # hidden only for initialization, later on hidden states are passed automatically for sequential data
-        x,  lstm_hidden = self.gru1(x, hidden_in)    # no activation after lstm
-#        x = activation(self.linear2(x))
-        x = F.tanh(self.linear3(x))
-        x = x.permute(1,0,2)  # permute back
-        return x, lstm_hidden    # lstm_hidden is actually tuple: (hidden, cell)
+        return x, lstm_hidden
+
 
     def evaluate(self, state, hidden_in, noise_scale=0.0):
         '''
         evaluate action within GPU graph, for gradients flowing through it, noise_scale controllable
         '''
+        # print("eval")
         normal = Normal(0, 1)
         action, hidden_out = self.forward(state, hidden_in)
-        noise = noise_scale * normal.sample(action.shape).cuda()
+        action = action.squeeze(0)
+        # noise = noise_scale * normal.sample(action.shape).cuda()
 #        print(action)
 #        action = action+noise
 #        while action > 1: # Angle wrapping
@@ -109,22 +143,30 @@ class DPG_PolicyNetworkGRU(PolicyNetworkBase):
         select action for sampling, no gradients flow, noisy action, return .cpu
         '''
         state = torch.FloatTensor(state).unsqueeze(0).cuda() # increase 2 dims to match with training data
+
 #        last_action = torch.FloatTensor(last_action).unsqueeze(0).unsqueeze(0).cuda()
-        normal = Normal(0, 1)
+        normal = Normal(0,1)
         action, hidden_out = self.forward(state, hidden_in)
-        #print("true action: ", action)
+        # print("TRUE action : ", action)
 
         noise = noise_scale * normal.sample(action.shape).cuda()
+        # action= torch.clip(action + noise, -1, 1)
         action= action + noise
-        #print("noise action", action)
+        #print(action)
+        # print("noise action", action)
 
-        while action[0][0][0] > 1: # Angle wrapping
-            action[0][0][0] = action[0][0][0] - 2
-        while action[0][0][0] < -1:
-            action[0][0][0] = action[0][0][0] + 2
+        # while action[0][0][0] > 1: # Angle wrapping
+        #     action[0][0][0] = action[0][0][0] - 2
+        # while action[0][0][0] < -1:
+        #     action[0][0][0] = action[0][0][0] + 2
 
-        while action[0][0][1] < 0:
-            action[0][0][1] = 0;
+        # while action[0][0][1] > 1: # Angle wrapping
+        #     action[0][0][0] = action[0][0][0] - 2
+        # while action[0][0][1] < -1:
+        #     action[0][0][0] = action[0][0][0] + 2
+
+        # while action[0][0][1] < 0:
+        #     action[0][0][1] = 0
         #print("wrapped action", action)
 
 
