@@ -21,9 +21,10 @@ for step in range(max_step):
     step+=1
     
     next_state, reward, done, info = env.step(action)
-    img = next_state.transpose(1, 2, 0)
+    print(next_state.shape)
+    img = next_state#.transpose(1, 2, 0)
     print(info)
-    
+    print(img.shape)
     # Get the map of red area
     red_map = np.zeros(res)
     for x in range(0, res[1]):
@@ -96,7 +97,7 @@ for step in range(max_step):
     Z = info[2]
     # Z = 0.7187*(area0/area)**(1/2)
     # 0.2813
-
+    print
     if Z < 0.003:
         Z = 0.003
 
